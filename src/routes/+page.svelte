@@ -1,28 +1,20 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { Command } from "@tauri-apps/plugin-shell";
-  import { BaseDirectory, readFile } from "@tauri-apps/plugin-fs";
+
+  import { dump, type CoreDumpInfo } from "../dotnet-dump";
 
   let dumpPath = $state(
     "/home/red/dev/dosaic/example/src/Dosaic.Example.Service/core_20250404_205206",
   );
-  let fileContents = $state("");
+  let errorMsg = $state("");
+  let heapStat = $state<CoreDumpInfo>({})
 
-  const readFileString = async () => {
-    const file = await readFile(dumpPath, {
-      baseDir: BaseDirectory.Home,
-    });
-    fileContents = new TextDecoder().decode(file);
-  };
+  const { execute, dumpHeapStat } = dump(dumpPath);
+
+
 
   const callDotnetDump = async () => {
-    let result = await Command.create("exec-sh", [
-      "-c",
-      "export DOTNET_ROOT=/home/red/.dotnet;echo $DOTNET_ROOT;dotnet-dump analyze "+dumpPath+" -c eeheap exit",
-    ]).execute();
-    console.log(result);
-
-    fileContents = result.stdout;
+    let result = await dumpHeapStat();
+    heapStat = result.result;
   };
 </script>
 
@@ -34,34 +26,21 @@
     placeholder="Enter a path to a dump file"
     bind:value={dumpPath}
   />
+  <p>{errorMsg}</p>
 
   <button onclick={callDotnetDump}>read</button>
-  <p>{fileContents}</p>
+  <ul>
+    {#each (heapStat?.objects ?? []).slice(0,100) as obj}
+      <li>{obj.type} {obj.address} {obj.totalSize} {obj.count}</li>
+    {/each}
+  </ul>
 </main>
 
 <style>
-  .logo.vite:hover {
-    filter: drop-shadow(0 0 2em #747bff);
-  }
-
-  .logo.svelte-kit:hover {
-    filter: drop-shadow(0 0 2em #ff3e00);
-  }
-
-  :root {
-    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-    font-size: 16px;
-    line-height: 24px;
-    font-weight: 400;
-
-    color: #0f0f0f;
-    background-color: #f6f6f6;
-
-    font-synthesis: none;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    -webkit-text-size-adjust: 100%;
+   li{
+    list-style: none;
+    padding: 0.5em;
+    text-align: left;
   }
 
   .container {
